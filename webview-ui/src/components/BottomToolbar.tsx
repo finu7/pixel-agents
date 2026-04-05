@@ -12,6 +12,7 @@ interface BottomToolbarProps {
   isSettingsOpen: boolean;
   onToggleSettings: () => void;
   workspaceFolders: WorkspaceFolder[];
+  onClearAll: () => void;
 }
 
 export function BottomToolbar({
@@ -21,6 +22,7 @@ export function BottomToolbar({
   isSettingsOpen,
   onToggleSettings,
   workspaceFolders,
+  onClearAll,
 }: BottomToolbarProps) {
   const [isFolderPickerOpen, setIsFolderPickerOpen] = useState(false);
   const [isBypassMenuOpen, setIsBypassMenuOpen] = useState(false);
@@ -129,6 +131,9 @@ export function BottomToolbar({
         title="Settings"
       >
         Settings
+      </Button>
+      <Button variant="default" onClick={onClearAll} title="Dismiss all agents">
+        Dismiss All
       </Button>
     </div>
   );

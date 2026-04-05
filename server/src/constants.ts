@@ -15,6 +15,10 @@ export const PERMISSION_TIMER_DELAY_MS = 7000;
 export const TEXT_IDLE_DELAY_MS = 5000;
 /** Heuristic: idle threshold for per-agent /clear detection (content check prevents stealing) */
 export const CLEAR_IDLE_THRESHOLD_MS = 2000;
+/** Heuristic: idle threshold for per-agent /exit detection (longer than clear to avoid false positives) */
+export const EXIT_IDLE_THRESHOLD_MS = 5000;
+/** Stale agent timeout: remove agents with no activity for this duration */
+export const STALE_AGENT_TIMEOUT_MS = 7_200_000; // 2 hours
 
 // ── External Session Detection ──────────────────────────────
 export const EXTERNAL_SCAN_INTERVAL_MS = 3000;

@@ -339,6 +339,7 @@ function App() {
         isSettingsOpen={isSettingsOpen}
         onToggleSettings={() => setIsSettingsOpen((v) => !v)}
         workspaceFolders={workspaceFolders}
+        onClearAll={() => vscode.postMessage({ type: 'clearAllAgents' })}
       />
 
       <VersionIndicator

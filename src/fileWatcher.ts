@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import {
   CLEAR_IDLE_THRESHOLD_MS,
   DISMISSED_COOLDOWN_MS,
+  EXIT_IDLE_THRESHOLD_MS,
   EXTERNAL_ACTIVE_THRESHOLD_MS,
   EXTERNAL_SCAN_INTERVAL_MS,
   EXTERNAL_STALE_CHECK_INTERVAL_MS,
@@ -13,6 +14,7 @@ import {
   GLOBAL_SCAN_ACTIVE_MAX_AGE_MS,
   GLOBAL_SCAN_ACTIVE_MIN_SIZE,
   PROJECT_SCAN_INTERVAL_MS,
+  STALE_AGENT_TIMEOUT_MS,
 } from '../server/src/constants.js';
 import { removeAgent } from './agentManager.js';
 import { TERMINAL_NAME_PREFIX } from './constants.js';
@@ -138,6 +140,46 @@ export function startFileWatching(
         }
       } catch {
         /* ignore dir read errors */
+      }
+    }
+
+    // Per-agent session-end detection: Claude process exited but terminal still running.
+    // Claude writes a "last-prompt" record at the end of every session (including /exit,
+    // plain "exit", and any other normal termination). Detect by finding this record in
+    // the JSONL file tail after the file has been idle for EXIT_IDLE_THRESHOLD_MS.
+    if (
+      clearDetectionDeps &&
+      agent.terminalRef &&
+      !agent.isExternal &&
+      agent.linesProcessed > 0 &&
+      agent.fileOffset === prevOffset &&
+      Date.now() - agent.lastDataAt > EXIT_IDLE_THRESHOLD_MS
+    ) {
+      const deps = clearDetectionDeps;
+      try {
+        const stat = fs.statSync(agent.jsonlFile);
+        const readSize = Math.min(stat.size, 8192);
+        if (readSize > 0) {
+          const buf = Buffer.alloc(readSize);
+          const fd = fs.openSync(agent.jsonlFile, 'r');
+          const bytesRead = fs.readSync(fd, buf, 0, readSize, stat.size - readSize);
+          fs.closeSync(fd);
+          const tail = buf.toString('utf-8', 0, bytesRead);
+          if (tail.includes('"last-prompt"')) {
+            console.log(
+              `[Pixel Agents] Agent ${agentId}: session end detected (last-prompt), removing agent`,
+            );
+            dismissedJsonlFiles.set(agent.jsonlFile, Date.now());
+            cancelWaitingTimer(agentId, waitingTimers);
+            cancelPermissionTimer(agentId, permissionTimers);
+            agents.delete(agentId);
+            deps.persistAgents();
+            webview?.postMessage({ type: 'agentClosed', id: agentId });
+            // interval will self-terminate on next tick (agents.has(agentId) === false)
+          }
+        }
+      } catch {
+        /* ignore file read errors */
       }
     }
   }, FILE_WATCHER_POLL_INTERVAL_MS);
@@ -397,6 +439,26 @@ function scanForNewJsonlFiles(
       persistAgents();
       webview?.postMessage({ type: 'agentClosed', id });
     }
+  }
+
+  // Clean up stale agents (no activity for STALE_AGENT_TIMEOUT_MS = 2 hours)
+  const now = Date.now();
+  for (const [id, agent] of agents) {
+    if (agent.lastDataAt === 0) continue; // never received data, skip
+    if (now - agent.lastDataAt < STALE_AGENT_TIMEOUT_MS) continue;
+    console.log(`[Pixel Agents] Agent ${id}: stale (no activity for 2h), removing`);
+    fileWatchers.get(id)?.close();
+    fileWatchers.delete(id);
+    const pt = pollingTimers.get(id);
+    if (pt) {
+      clearInterval(pt);
+    }
+    pollingTimers.delete(id);
+    cancelWaitingTimer(id, waitingTimers);
+    cancelPermissionTimer(id, permissionTimers);
+    agents.delete(id);
+    persistAgents();
+    webview?.postMessage({ type: 'agentClosed', id });
   }
 }
 
@@ -936,10 +998,11 @@ export function reassignAgentToFile(
   }
   pollingTimers.delete(agentId);
 
-  // Clear activity
+  // Clear activity and despawn character in webview
   cancelWaitingTimer(agentId, waitingTimers);
   cancelPermissionTimer(agentId, permissionTimers);
   clearAgentActivity(agent, agentId, permissionTimers, webview);
+  webview?.postMessage({ type: 'agentClosed', id: agentId });
 
   // Permanently dismiss old file so scanners never re-adopt it as external
   clearDismissedFiles.add(agent.jsonlFile);
@@ -964,4 +1027,10 @@ export function reassignAgentToFile(
     webview,
   );
   readNewLines(agentId, agents, waitingTimers, permissionTimers, webview);
+
+  // Respawn character after despawn animation completes (300ms)
+  const capturedId = agentId;
+  setTimeout(() => {
+    webview?.postMessage({ type: 'agentCreated', id: capturedId });
+  }, 400);
 }

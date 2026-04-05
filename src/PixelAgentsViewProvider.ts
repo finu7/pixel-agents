@@ -222,6 +222,25 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
             webviewView.webview.postMessage({ type: 'agentClosed', id: message.id });
           }
         }
+      } else if (message.type === 'clearAllAgents') {
+        for (const [id, agent] of [...this.agents]) {
+          if (agent.terminalRef) {
+            agent.terminalRef.dispose();
+          } else {
+            dismissedJsonlFiles.set(agent.jsonlFile, Date.now());
+            removeAgent(
+              id,
+              this.agents,
+              this.fileWatchers,
+              this.pollingTimers,
+              this.waitingTimers,
+              this.permissionTimers,
+              this.jsonlPollTimers,
+              this.persistAgents,
+            );
+            webviewView.webview.postMessage({ type: 'agentClosed', id });
+          }
+        }
       } else if (message.type === 'saveAgentSeats') {
         // Store seat assignments in a separate key (never touched by persistAgents)
         console.log(`[Pixel Agents] saveAgentSeats:`, JSON.stringify(message.seats));
