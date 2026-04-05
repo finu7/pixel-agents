@@ -55,6 +55,8 @@ import {
 } from './fileWatcher.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readLayoutFromFile, watchLayoutFile, writeLayoutToFile } from './layoutPersistence.js';
+import type { TicketTasks } from './tasksBoardWatcher.js';
+import { scanTasksBoard, startTasksBoardWatch } from './tasksBoardWatcher.js';
 import type { AgentState } from './types.js';
 
 export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
@@ -91,6 +93,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
   // Cross-window layout sync
   layoutWatcher: LayoutWatcher | null = null;
+
+  // Tasks board
+  tasksBoardFsWatcher: fs.FSWatcher | null = null;
 
   // Pixel Agents Server (hook event reception)
   private pixelAgentsServer: PixelAgentsServer | null = null;
@@ -341,7 +346,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           hooksEnabled,
           hooksInfoShown,
           externalAssetDirectories: config.externalAssetDirectories,
+          specsDirectory: config.specsDirectory ?? null,
         });
+
+        if (config.specsDirectory) {
+          this.startTasksBoardWatcher(config.specsDirectory);
+        }
 
         // Send workspace folders to webview (only when multi-root)
         const wsFolders = vscode.workspace.workspaceFolders;
@@ -554,6 +564,28 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           fs.writeFileSync(uri.fsPath, JSON.stringify(layout, null, 2), 'utf-8');
           vscode.window.showInformationMessage('Pixel Agents: Layout exported successfully.');
         }
+      } else if (message.type === 'setSpecsDirectory') {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFolders: true,
+          canSelectFiles: false,
+          canSelectMany: false,
+          openLabel: 'Select Specs Directory',
+        });
+        if (!uris || uris.length === 0) return;
+        const newPath = uris[0].fsPath;
+        const cfg = readConfig();
+        cfg.specsDirectory = newPath;
+        writeConfig(cfg);
+        this.startTasksBoardWatcher(newPath);
+        this.webview?.postMessage({ type: 'specsDirectoryUpdated', path: newPath });
+      } else if (message.type === 'clearSpecsDirectory') {
+        const cfg = readConfig();
+        cfg.specsDirectory = undefined;
+        writeConfig(cfg);
+        this.tasksBoardFsWatcher?.close();
+        this.tasksBoardFsWatcher = null;
+        this.webview?.postMessage({ type: 'specsDirectoryUpdated', path: null });
+        this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets: [] });
       } else if (message.type === 'addExternalAssetDirectory') {
         const uris = await vscode.window.showOpenDialog({
           canSelectFolders: true,
@@ -707,6 +739,16 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       }
     }
     return chars;
+  }
+
+  private startTasksBoardWatcher(specsDir: string): void {
+    this.tasksBoardFsWatcher?.close();
+    this.tasksBoardFsWatcher = null;
+    const tickets = scanTasksBoard(specsDir);
+    this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets });
+    this.tasksBoardFsWatcher = startTasksBoardWatch(specsDir, (updated: TicketTasks[]) => {
+      this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets: updated });
+    });
   }
 
   private async reloadAndSendFurniture(): Promise<void> {

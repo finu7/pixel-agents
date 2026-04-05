@@ -8,6 +8,7 @@ import { DebugView } from './components/DebugView.js';
 import { EditActionBar } from './components/EditActionBar.js';
 import { MigrationNotice } from './components/MigrationNotice.js';
 import { SettingsModal } from './components/SettingsModal.js';
+import { TasksBoard } from './components/TasksBoard.js';
 import { Tooltip } from './components/Tooltip.js';
 import { Modal } from './components/ui/Modal.js';
 import { VersionIndicator } from './components/VersionIndicator.js';
@@ -73,6 +74,8 @@ function App() {
     hooksEnabled,
     setHooksEnabled,
     hooksInfoShown,
+    ticketTasks,
+    specsDirectory,
   } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty);
 
   // Show migration notice once layout reset is detected
@@ -240,6 +243,7 @@ function App() {
               );
             })()}
 
+          <TasksBoard tickets={ticketTasks} specsDirectory={specsDirectory} />
           <BulletinBoard
             agents={agents}
             officeState={officeState}
@@ -364,6 +368,7 @@ function App() {
           setWatchAllSessions(newVal);
           vscode.postMessage({ type: 'setWatchAllSessions', enabled: newVal });
         }}
+        specsDirectory={specsDirectory}
         hooksEnabled={hooksEnabled}
         onToggleHooksEnabled={() => {
           const newVal = !hooksEnabled;

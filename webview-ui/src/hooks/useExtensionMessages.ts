@@ -11,6 +11,19 @@ import type { OfficeLayout, ToolActivity } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
 import { vscode } from '../vscodeApi.js';
 
+export interface TaskStage {
+  name: string;
+  done: number;
+  total: number;
+}
+
+export interface TicketTasks {
+  id: string;
+  stages: TaskStage[];
+  done: number;
+  total: number;
+}
+
 export interface SubagentCharacter {
   id: number;
   parentAgentId: number;
@@ -67,6 +80,8 @@ export interface ExtensionMessageState {
   hooksEnabled: boolean;
   setHooksEnabled: (v: boolean) => void;
   hooksInfoShown: boolean;
+  ticketTasks: TicketTasks[];
+  specsDirectory: string | null;
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -88,6 +103,8 @@ export function useExtensionMessages(
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({});
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({});
   const [lastMessages, setLastMessages] = useState<Record<number, string>>({});
+  const [ticketTasks, setTicketTasks] = useState<TicketTasks[]>([]);
+  const [specsDirectory, setSpecsDirectory] = useState<string | null>(null);
   const [subagentTools, setSubagentTools] = useState<
     Record<number, Record<string, ToolActivity[]>>
   >({});
@@ -436,6 +453,9 @@ export function useExtensionMessages(
         if (Array.isArray(msg.externalAssetDirectories)) {
           setExternalAssetDirectories(msg.externalAssetDirectories as string[]);
         }
+        if (typeof msg.specsDirectory === 'string') {
+          setSpecsDirectory(msg.specsDirectory);
+        }
         if (typeof msg.lastSeenVersion === 'string') {
           setLastSeenVersion(msg.lastSeenVersion as string);
         }
@@ -446,6 +466,10 @@ export function useExtensionMessages(
         if (Array.isArray(msg.dirs)) {
           setExternalAssetDirectories(msg.dirs as string[]);
         }
+      } else if (msg.type === 'ticketTasksUpdate') {
+        setTicketTasks(msg.tickets as TicketTasks[]);
+      } else if (msg.type === 'specsDirectoryUpdated') {
+        setSpecsDirectory((msg.path as string | null) ?? null);
       } else if (msg.type === 'furnitureAssetsLoaded') {
         try {
           const catalog = msg.catalog as FurnitureAsset[];
@@ -486,5 +510,7 @@ export function useExtensionMessages(
     hooksEnabled,
     setHooksEnabled,
     hooksInfoShown,
+    ticketTasks,
+    specsDirectory,
   };
 }

@@ -6,6 +6,7 @@ import { CONFIG_FILE_NAME, LAYOUT_FILE_DIR } from './constants.js';
 
 export interface PixelAgentsConfig {
   externalAssetDirectories: string[];
+  specsDirectory?: string;
 }
 
 const DEFAULT_CONFIG: PixelAgentsConfig = {
@@ -26,6 +27,7 @@ export function readConfig(): PixelAgentsConfig {
       externalAssetDirectories: Array.isArray(parsed.externalAssetDirectories)
         ? parsed.externalAssetDirectories.filter((d): d is string => typeof d === 'string')
         : [],
+      specsDirectory: typeof parsed.specsDirectory === 'string' ? parsed.specsDirectory : undefined,
     };
   } catch (err) {
     console.error('[Pixel Agents] Failed to read config file:', err);

@@ -19,6 +19,7 @@ interface SettingsModalProps {
   onToggleWatchAllSessions: () => void;
   hooksEnabled: boolean;
   onToggleHooksEnabled: () => void;
+  specsDirectory: string | null;
 }
 
 export function SettingsModal({
@@ -33,6 +34,7 @@ export function SettingsModal({
   onToggleWatchAllSessions,
   hooksEnabled,
   onToggleHooksEnabled,
+  specsDirectory,
 }: SettingsModalProps) {
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
 
@@ -62,6 +64,26 @@ export function SettingsModal({
       >
         Import Layout
       </MenuItem>
+      <MenuItem
+        onClick={() => {
+          vscode.postMessage({ type: 'setSpecsDirectory' });
+          onClose();
+        }}
+      >
+        {specsDirectory
+          ? `Tasks: ${specsDirectory.split(/[/\\]/).pop() ?? specsDirectory}`
+          : 'Set Tasks Specs Directory'}
+      </MenuItem>
+      {specsDirectory && (
+        <MenuItem
+          onClick={() => {
+            vscode.postMessage({ type: 'clearSpecsDirectory' });
+            onClose();
+          }}
+        >
+          Clear Tasks Specs Directory
+        </MenuItem>
+      )}
       <MenuItem
         onClick={() => {
           vscode.postMessage({ type: 'addExternalAssetDirectory' });
