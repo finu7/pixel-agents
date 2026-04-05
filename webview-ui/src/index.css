@@ -37,6 +37,14 @@
   --color-status-success: #89d185;
   --color-status-error: var(--color-danger);
 
+  /* Bulletin board */
+  --color-board-bg: #c8a97a;
+  --color-board-frame: #7a4f2a;
+  --color-board-card: #f5f0e8;
+  --color-board-card-text: #2a1a0a;
+  --color-board-card-muted: #7a6a5a;
+  --color-board-tab: #8b5e2e;
+
   /* Shadow */
   --shadow-pixel: 2px 2px 0px #0a0a14;
 

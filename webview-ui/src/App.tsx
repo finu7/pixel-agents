@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { toMajorMinor } from './changelogData.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
+import { BulletinBoard } from './components/BulletinBoard.js';
 import { ChangelogModal } from './components/ChangelogModal.js';
 import { DebugView } from './components/DebugView.js';
 import { EditActionBar } from './components/EditActionBar.js';
@@ -239,6 +240,12 @@ function App() {
               );
             })()}
 
+          <BulletinBoard
+            agents={agents}
+            officeState={officeState}
+            agentTools={agentTools}
+            lastMessages={lastMessages}
+          />
           <ToolOverlay
             officeState={officeState}
             agents={agents}
