@@ -11,8 +11,14 @@ import type { OfficeLayout, ToolActivity } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
 import { vscode } from '../vscodeApi.js';
 
+export interface TaskItem {
+  text: string;
+  done: boolean;
+}
+
 export interface TaskStage {
   name: string;
+  items: TaskItem[];
   done: number;
   total: number;
 }
@@ -81,7 +87,7 @@ export interface ExtensionMessageState {
   setHooksEnabled: (v: boolean) => void;
   hooksInfoShown: boolean;
   ticketTasks: TicketTasks[];
-  specsDirectory: string | null;
+  specsDirectories: string[];
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -104,7 +110,7 @@ export function useExtensionMessages(
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({});
   const [lastMessages, setLastMessages] = useState<Record<number, string>>({});
   const [ticketTasks, setTicketTasks] = useState<TicketTasks[]>([]);
-  const [specsDirectory, setSpecsDirectory] = useState<string | null>(null);
+  const [specsDirectories, setSpecsDirectories] = useState<string[]>([]);
   const [subagentTools, setSubagentTools] = useState<
     Record<number, Record<string, ToolActivity[]>>
   >({});
@@ -453,8 +459,8 @@ export function useExtensionMessages(
         if (Array.isArray(msg.externalAssetDirectories)) {
           setExternalAssetDirectories(msg.externalAssetDirectories as string[]);
         }
-        if (typeof msg.specsDirectory === 'string') {
-          setSpecsDirectory(msg.specsDirectory);
+        if (Array.isArray(msg.specsDirectories)) {
+          setSpecsDirectories(msg.specsDirectories as string[]);
         }
         if (typeof msg.lastSeenVersion === 'string') {
           setLastSeenVersion(msg.lastSeenVersion as string);
@@ -468,8 +474,8 @@ export function useExtensionMessages(
         }
       } else if (msg.type === 'ticketTasksUpdate') {
         setTicketTasks(msg.tickets as TicketTasks[]);
-      } else if (msg.type === 'specsDirectoryUpdated') {
-        setSpecsDirectory((msg.path as string | null) ?? null);
+      } else if (msg.type === 'specsDirectoriesUpdated') {
+        setSpecsDirectories(msg.dirs as string[]);
       } else if (msg.type === 'furnitureAssetsLoaded') {
         try {
           const catalog = msg.catalog as FurnitureAsset[];
@@ -511,6 +517,6 @@ export function useExtensionMessages(
     setHooksEnabled,
     hooksInfoShown,
     ticketTasks,
-    specsDirectory,
+    specsDirectories,
   };
 }

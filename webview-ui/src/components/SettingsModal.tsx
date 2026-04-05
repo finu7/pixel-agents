@@ -19,7 +19,7 @@ interface SettingsModalProps {
   onToggleWatchAllSessions: () => void;
   hooksEnabled: boolean;
   onToggleHooksEnabled: () => void;
-  specsDirectory: string | null;
+  specsDirectories: string[];
 }
 
 export function SettingsModal({
@@ -34,7 +34,7 @@ export function SettingsModal({
   onToggleWatchAllSessions,
   hooksEnabled,
   onToggleHooksEnabled,
-  specsDirectory,
+  specsDirectories,
 }: SettingsModalProps) {
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
 
@@ -70,20 +70,26 @@ export function SettingsModal({
           onClose();
         }}
       >
-        {specsDirectory
-          ? `Tasks: ${specsDirectory.split(/[/\\]/).pop() ?? specsDirectory}`
-          : 'Set Tasks Specs Directory'}
+        Add Tasks Specs Directory
       </MenuItem>
-      {specsDirectory && (
-        <MenuItem
-          onClick={() => {
-            vscode.postMessage({ type: 'clearSpecsDirectory' });
-            onClose();
-          }}
-        >
-          Clear Tasks Specs Directory
-        </MenuItem>
-      )}
+      {specsDirectories.map((dir) => (
+        <div key={dir} className="flex items-center justify-between py-4 px-10 gap-8">
+          <span
+            className="text-xs text-text-muted overflow-hidden text-ellipsis whitespace-nowrap"
+            title={dir}
+          >
+            📌 {dir.split(/[/\\]/).pop() ?? dir}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => vscode.postMessage({ type: 'removeSpecsDirectory', path: dir })}
+            className="shrink-0"
+          >
+            x
+          </Button>
+        </div>
+      ))}
       <MenuItem
         onClick={() => {
           vscode.postMessage({ type: 'addExternalAssetDirectory' });

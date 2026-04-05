@@ -55,8 +55,7 @@ import {
 } from './fileWatcher.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readLayoutFromFile, watchLayoutFile, writeLayoutToFile } from './layoutPersistence.js';
-import type { TicketTasks } from './tasksBoardWatcher.js';
-import { scanTasksBoard, startTasksBoardWatch } from './tasksBoardWatcher.js';
+import { scanAllTasksBoards, startTasksBoardWatch } from './tasksBoardWatcher.js';
 import type { AgentState } from './types.js';
 
 export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
@@ -95,7 +94,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   layoutWatcher: LayoutWatcher | null = null;
 
   // Tasks board
-  tasksBoardFsWatcher: fs.FSWatcher | null = null;
+  tasksBoardFsWatchers: fs.FSWatcher[] = [];
 
   // Pixel Agents Server (hook event reception)
   private pixelAgentsServer: PixelAgentsServer | null = null;
@@ -346,11 +345,11 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           hooksEnabled,
           hooksInfoShown,
           externalAssetDirectories: config.externalAssetDirectories,
-          specsDirectory: config.specsDirectory ?? null,
+          specsDirectories: config.specsDirectories,
         });
 
-        if (config.specsDirectory) {
-          this.startTasksBoardWatcher(config.specsDirectory);
+        if (config.specsDirectories.length > 0) {
+          this.startTasksBoardWatchers(config.specsDirectories);
         }
 
         // Send workspace folders to webview (only when multi-root)
@@ -574,18 +573,21 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         if (!uris || uris.length === 0) return;
         const newPath = uris[0].fsPath;
         const cfg = readConfig();
-        cfg.specsDirectory = newPath;
-        writeConfig(cfg);
-        this.startTasksBoardWatcher(newPath);
-        this.webview?.postMessage({ type: 'specsDirectoryUpdated', path: newPath });
-      } else if (message.type === 'clearSpecsDirectory') {
+        if (!cfg.specsDirectories.includes(newPath)) {
+          cfg.specsDirectories.push(newPath);
+          writeConfig(cfg);
+          this.startTasksBoardWatchers(cfg.specsDirectories);
+          this.webview?.postMessage({
+            type: 'specsDirectoriesUpdated',
+            dirs: cfg.specsDirectories,
+          });
+        }
+      } else if (message.type === 'removeSpecsDirectory') {
         const cfg = readConfig();
-        cfg.specsDirectory = undefined;
+        cfg.specsDirectories = cfg.specsDirectories.filter((d) => d !== (message.path as string));
         writeConfig(cfg);
-        this.tasksBoardFsWatcher?.close();
-        this.tasksBoardFsWatcher = null;
-        this.webview?.postMessage({ type: 'specsDirectoryUpdated', path: null });
-        this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets: [] });
+        this.startTasksBoardWatchers(cfg.specsDirectories);
+        this.webview?.postMessage({ type: 'specsDirectoriesUpdated', dirs: cfg.specsDirectories });
       } else if (message.type === 'addExternalAssetDirectory') {
         const uris = await vscode.window.showOpenDialog({
           canSelectFolders: true,
@@ -741,14 +743,18 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     return chars;
   }
 
-  private startTasksBoardWatcher(specsDir: string): void {
-    this.tasksBoardFsWatcher?.close();
-    this.tasksBoardFsWatcher = null;
-    const tickets = scanTasksBoard(specsDir);
-    this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets });
-    this.tasksBoardFsWatcher = startTasksBoardWatch(specsDir, (updated: TicketTasks[]) => {
-      this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets: updated });
-    });
+  private startTasksBoardWatchers(specsDirs: string[]): void {
+    for (const w of this.tasksBoardFsWatchers) w.close();
+    this.tasksBoardFsWatchers = [];
+    const sendUpdate = () => {
+      const tickets = scanAllTasksBoards(specsDirs);
+      this.webview?.postMessage({ type: 'ticketTasksUpdate', tickets });
+    };
+    sendUpdate();
+    for (const dir of specsDirs) {
+      const w = startTasksBoardWatch(dir, sendUpdate);
+      if (w) this.tasksBoardFsWatchers.push(w);
+    }
   }
 
   private async reloadAndSendFurniture(): Promise<void> {

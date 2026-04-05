@@ -5,7 +5,7 @@ import { vscode } from '../vscodeApi.js';
 
 interface TasksBoardProps {
   tickets: TicketTasks[];
-  specsDirectory: string | null;
+  specsDirectories: string[];
 }
 
 function ProgressBar({ done, total }: { done: number; total: number }) {
@@ -34,7 +34,7 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
   );
 }
 
-export function TasksBoard({ tickets, specsDirectory }: TasksBoardProps) {
+export function TasksBoard({ tickets, specsDirectories }: TasksBoardProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -72,7 +72,7 @@ export function TasksBoard({ tickets, specsDirectory }: TasksBoardProps) {
         </div>
 
         <div className="flex flex-col gap-8 p-8">
-          {!specsDirectory ? (
+          {specsDirectories.length === 0 ? (
             <div
               style={{
                 fontSize: 13,
@@ -141,37 +141,59 @@ export function TasksBoard({ tickets, specsDirectory }: TasksBoardProps) {
                   </span>
                 </div>
                 <ProgressBar done={ticket.done} total={ticket.total} />
-                <div className="flex flex-col gap-2" style={{ marginTop: 4 }}>
-                  {ticket.stages.map((stage, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 12,
-                        color:
-                          stage.done === stage.total && stage.total > 0
-                            ? 'var(--color-status-success)'
-                            : 'var(--color-board-card-muted)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
-                        }}
-                      >
-                        {stage.done === stage.total && stage.total > 0 ? '✓ ' : '· '}
-                        {stage.name}
-                      </span>
-                      <span style={{ marginLeft: 6, flexShrink: 0 }}>
-                        {stage.done}/{stage.total}
-                      </span>
-                    </div>
-                  ))}
+                <div className="flex flex-col gap-4" style={{ marginTop: 6 }}>
+                  {ticket.stages.map((stage, i) => {
+                    const stageDone = stage.done === stage.total && stage.total > 0;
+                    return (
+                      <div key={i}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 'bold',
+                            color: stageDone
+                              ? 'var(--color-status-success)'
+                              : 'var(--color-board-card-text)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: 2,
+                          }}
+                        >
+                          <span>
+                            {stageDone ? '✓ ' : '■ '}
+                            {stage.name}
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 'normal',
+                              color: 'var(--color-board-card-muted)',
+                              flexShrink: 0,
+                              marginLeft: 6,
+                            }}
+                          >
+                            {stage.done}/{stage.total}
+                          </span>
+                        </div>
+                        {stage.items.map((item, j) => (
+                          <div
+                            key={j}
+                            style={{
+                              fontSize: 12,
+                              color: item.done
+                                ? 'var(--color-board-card-muted)'
+                                : 'var(--color-board-card-text)',
+                              textDecoration: item.done ? 'line-through' : 'none',
+                              paddingLeft: 12,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {item.done ? '✓' : '·'} {item.text}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))

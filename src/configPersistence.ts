@@ -6,11 +6,12 @@ import { CONFIG_FILE_NAME, LAYOUT_FILE_DIR } from './constants.js';
 
 export interface PixelAgentsConfig {
   externalAssetDirectories: string[];
-  specsDirectory?: string;
+  specsDirectories: string[];
 }
 
 const DEFAULT_CONFIG: PixelAgentsConfig = {
   externalAssetDirectories: [],
+  specsDirectories: [],
 };
 
 function getConfigFilePath(): string {
@@ -22,12 +23,17 @@ export function readConfig(): PixelAgentsConfig {
   try {
     if (!fs.existsSync(filePath)) return { ...DEFAULT_CONFIG };
     const raw = fs.readFileSync(filePath, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<PixelAgentsConfig>;
+    const parsed = JSON.parse(raw) as Partial<PixelAgentsConfig> & { specsDirectory?: string };
+    // migrate legacy single specsDirectory to array
+    const legacy = typeof parsed.specsDirectory === 'string' ? [parsed.specsDirectory] : [];
+    const dirs = Array.isArray(parsed.specsDirectories)
+      ? parsed.specsDirectories.filter((d): d is string => typeof d === 'string')
+      : legacy;
     return {
       externalAssetDirectories: Array.isArray(parsed.externalAssetDirectories)
         ? parsed.externalAssetDirectories.filter((d): d is string => typeof d === 'string')
         : [],
-      specsDirectory: typeof parsed.specsDirectory === 'string' ? parsed.specsDirectory : undefined,
+      specsDirectories: dirs,
     };
   } catch (err) {
     console.error('[Pixel Agents] Failed to read config file:', err);

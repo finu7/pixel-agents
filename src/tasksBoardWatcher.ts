@@ -1,8 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+export interface TaskItem {
+  text: string;
+  done: boolean;
+}
+
 export interface TaskStage {
   name: string;
+  items: TaskItem[];
   done: number;
   total: number;
 }
@@ -23,11 +29,13 @@ function parseTasksMd(content: string): { stages: TaskStage[]; done: number; tot
 
   for (const line of lines) {
     if (line.startsWith('## ')) {
-      currentStage = { name: line.slice(3).trim(), done: 0, total: 0 };
+      currentStage = { name: line.slice(3).trim(), items: [], done: 0, total: 0 };
       stages.push(currentStage);
     } else if (/^- \[[ x]\]/.test(line)) {
       const isDone = line.startsWith('- [x]');
+      const text = line.replace(/^- \[[ x]\]\s*/, '').trim();
       if (currentStage) {
+        currentStage.items.push({ text, done: isDone });
         currentStage.total++;
         if (isDone) currentStage.done++;
       }
@@ -39,65 +47,72 @@ function parseTasksMd(content: string): { stages: TaskStage[]; done: number; tot
   return { stages, done, total };
 }
 
-export function scanTasksBoard(specsDir: string): TicketTasks[] {
-  const planningDir = path.join(specsDir, 'Versions', 'planning');
-  if (!fs.existsSync(planningDir)) return [];
-
-  let versions: string[];
+function findTasksFiles(dir: string, results: string[] = []): string[] {
   try {
-    versions = fs
-      .readdirSync(planningDir)
-      .filter((d) => /^v\d+\.\d+\.\d+$/.test(d))
-      .sort()
-      .reverse();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        findTasksFiles(path.join(dir, entry.name), results);
+      } else if (entry.name === 'tasks.md') {
+        results.push(path.join(dir, entry.name));
+      }
+    }
   } catch {
-    return [];
+    // skip unreadable dirs
   }
+  return results;
+}
 
-  // Collect all tickets across all versions, newest version wins on duplicate IDs
+export function scanTasksBoard(specsDir: string): TicketTasks[] {
+  if (!fs.existsSync(specsDir)) return [];
+
+  const taskFiles = findTasksFiles(specsDir);
   const seen = new Set<string>();
   const tickets: TicketTasks[] = [];
 
-  for (const version of versions) {
-    const ticketsDir = path.join(planningDir, version, 'tickets');
-    if (!fs.existsSync(ticketsDir)) continue;
-    for (const ticketId of fs.readdirSync(ticketsDir).sort()) {
-      if (seen.has(ticketId)) continue;
-      const tasksFile = path.join(ticketsDir, ticketId, 'tasks.md');
-      if (!fs.existsSync(tasksFile)) continue;
-      try {
-        const content = fs.readFileSync(tasksFile, 'utf-8');
-        const { stages, done, total } = parseTasksMd(content);
-        tickets.push({ id: ticketId, stages, done, total });
-        seen.add(ticketId);
-      } catch {
-        // skip unreadable files
-      }
+  for (const file of taskFiles) {
+    const ticketId = path.basename(path.dirname(file));
+    if (seen.has(ticketId)) continue;
+    try {
+      const content = fs.readFileSync(file, 'utf-8');
+      const { stages, done, total } = parseTasksMd(content);
+      tickets.push({ id: ticketId, stages, done, total });
+      seen.add(ticketId);
+    } catch {
+      // skip unreadable files
     }
   }
 
   return tickets.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function startTasksBoardWatch(
-  specsDir: string,
-  onUpdate: (tickets: TicketTasks[]) => void,
-): fs.FSWatcher | null {
-  const planningDir = path.join(specsDir, 'Versions', 'planning');
-  if (!fs.existsSync(planningDir)) return null;
+export function scanAllTasksBoards(specsDirs: string[]): TicketTasks[] {
+  const seen = new Set<string>();
+  const all: TicketTasks[] = [];
+  for (const dir of specsDirs) {
+    for (const ticket of scanTasksBoard(dir)) {
+      if (!seen.has(ticket.id)) {
+        all.push(ticket);
+        seen.add(ticket.id);
+      }
+    }
+  }
+  return all.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+export function startTasksBoardWatch(specsDir: string, onUpdate: () => void): fs.FSWatcher | null {
+  if (!fs.existsSync(specsDir)) return null;
 
   let debounce: ReturnType<typeof setTimeout> | null = null;
 
   const trigger = () => {
     if (debounce) clearTimeout(debounce);
-    debounce = setTimeout(() => {
-      onUpdate(scanTasksBoard(specsDir));
-    }, 300);
+    debounce = setTimeout(onUpdate, 300);
   };
 
   try {
-    const watcher = fs.watch(planningDir, { recursive: true }, trigger);
-    return watcher;
+    return fs.watch(specsDir, { recursive: true }, (_, filename) => {
+      if (filename?.endsWith('tasks.md')) trigger();
+    });
   } catch {
     return null;
   }
