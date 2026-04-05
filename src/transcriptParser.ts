@@ -72,6 +72,30 @@ export function processTranscriptLine(
   try {
     const record = JSON.parse(line);
 
+    // Detect cwd / gitBranch / slug and build a combined label
+    let labelUpdated = false;
+    if (!agent.gitBranch && typeof record.gitBranch === 'string' && record.gitBranch) {
+      agent.gitBranch = record.gitBranch;
+      labelUpdated = true;
+    }
+    if (!agent.slug && typeof record.slug === 'string' && record.slug) {
+      agent.slug = record.slug;
+      labelUpdated = true;
+    }
+    if (!agent.cwd && typeof record.cwd === 'string' && record.cwd) {
+      agent.cwd = record.cwd;
+      labelUpdated = true;
+    }
+    if (labelUpdated) {
+      const parts: string[] = [];
+      if (agent.cwd) parts.push(agent.cwd.split('/').filter(Boolean).pop() ?? agent.cwd);
+      if (agent.gitBranch) parts.push(agent.gitBranch);
+      if (agent.slug) parts.push(agent.slug);
+      if (parts.length > 0) {
+        webview?.postMessage({ type: 'agentBranch', id: agentId, branch: parts.join(' · ') });
+      }
+    }
+
     // Resilient content extraction: support both record.message.content and record.content
     // Claude Code may change the JSONL structure across versions
     const assistantContent = record.message?.content ?? record.content;
@@ -115,14 +139,23 @@ export function processTranscriptLine(
         if (hasNonExemptTool && !agent.hookDelivered) {
           startPermissionTimer(agentId, agents, permissionTimers, PERMISSION_EXEMPT_TOOLS, webview);
         }
-      } else if (blocks.some((b) => b.type === 'text') && !agent.hadToolsInTurn) {
-        // Text-only response in a turn that hasn't used any tools.
-        // turn_duration handles tool-using turns reliably but is never
-        // emitted for text-only turns, so we use a silence-based timer:
-        // if no new JSONL data arrives within TEXT_IDLE_DELAY_MS, mark as waiting.
-        // Skip when hooks are active — Stop hook handles this exactly.
-        if (!agent.hookDelivered) {
-          startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers, webview);
+      } else if (blocks.some((b) => b.type === 'text')) {
+        const textBlock = blocks.find((b) => b.type === 'text') as
+          | { type: string; text?: string }
+          | undefined;
+        if (textBlock?.text) {
+          const firstLine = textBlock.text.split('\n').find((l) => l.trim()) ?? textBlock.text;
+          webview?.postMessage({ type: 'agentLastMessage', id: agentId, text: firstLine.trim() });
+        }
+        if (!agent.hadToolsInTurn) {
+          // Text-only response in a turn that hasn't used any tools.
+          // turn_duration handles tool-using turns reliably but is never
+          // emitted for text-only turns, so we use a silence-based timer:
+          // if no new JSONL data arrives within TEXT_IDLE_DELAY_MS, mark as waiting.
+          // Skip when hooks are active — Stop hook handles this exactly.
+          if (!agent.hookDelivered) {
+            startWaitingTimer(agentId, TEXT_IDLE_DELAY_MS, agents, waitingTimers, webview);
+          }
         }
       }
     } else if (record.type === 'assistant' && typeof assistantContent === 'string') {

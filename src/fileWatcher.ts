@@ -464,6 +464,60 @@ function adoptTerminalForFile(
   readNewLines(id, agents, waitingTimers, permissionTimers, webview);
 }
 
+/** Scan the first 64KB of a JSONL file for cwd, gitBranch, slug.
+ *  Used when adopting external sessions that skip to end-of-file. */
+function scanFileHeader(
+  agentId: number,
+  jsonlFile: string,
+  agent: AgentState,
+  webview: vscode.Webview | undefined,
+): void {
+  try {
+    const MAX_HEADER_BYTES = 65536;
+    const stat = fs.statSync(jsonlFile);
+    const bytesToRead = Math.min(stat.size, MAX_HEADER_BYTES);
+    const buf = Buffer.alloc(bytesToRead);
+    const fd = fs.openSync(jsonlFile, 'r');
+    fs.readSync(fd, buf, 0, bytesToRead, 0);
+    fs.closeSync(fd);
+
+    const lines = buf.toString('utf-8').split('\n');
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const record = JSON.parse(line) as Record<string, unknown>;
+        let labelUpdated = false;
+        if (!agent.gitBranch && typeof record.gitBranch === 'string' && record.gitBranch) {
+          agent.gitBranch = record.gitBranch;
+          labelUpdated = true;
+        }
+        if (!agent.slug && typeof record.slug === 'string' && record.slug) {
+          agent.slug = record.slug;
+          labelUpdated = true;
+        }
+        if (!agent.cwd && typeof record.cwd === 'string' && record.cwd) {
+          agent.cwd = record.cwd;
+          labelUpdated = true;
+        }
+        if (labelUpdated) {
+          const parts: string[] = [];
+          if (agent.cwd) parts.push(agent.cwd.split('/').filter(Boolean).pop() ?? agent.cwd);
+          if (agent.gitBranch) parts.push(agent.gitBranch);
+          if (agent.slug) parts.push(agent.slug);
+          if (parts.length > 0) {
+            webview?.postMessage({ type: 'agentBranch', id: agentId, branch: parts.join(' · ') });
+          }
+        }
+        if (agent.cwd && agent.gitBranch && agent.slug) break;
+      } catch {
+        /* skip malformed lines */
+      }
+    }
+  } catch {
+    /* ignore read errors */
+  }
+}
+
 // ── External session support (VS Code extension panel, etc.) ──
 
 function adoptExternalSession(
@@ -520,6 +574,10 @@ function adoptExternalSession(
     `[Pixel Agents] Agent ${id}: detected external session ${path.basename(jsonlFile)}${folderName ? ` (${folderName})` : ''}`,
   );
   webview?.postMessage({ type: 'agentCreated', id, isExternal: true, folderName });
+
+  // Scan the beginning of the file for cwd, gitBranch, slug
+  // (these appear early in the file before the skip-to-end offset)
+  scanFileHeader(id, jsonlFile, agent, webview);
 
   startFileWatching(
     id,

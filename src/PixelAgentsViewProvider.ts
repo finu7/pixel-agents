@@ -80,7 +80,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   staleCheckTimer: ReturnType<typeof setInterval> | null = null;
 
   // Global session scanning (opt-in "Watch All Sessions" toggle)
-  watchAllSessions = { current: false };
+  watchAllSessions = { current: true };
   globalDismissedFiles = new Set<string>();
 
   // Bundled default layout (loaded from assets/default-layout.json)
@@ -318,7 +318,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           (this.context.extension.packageJSON as { version?: string }).version ?? '';
         const watchAllSessions = this.context.globalState.get<boolean>(
           GLOBAL_KEY_WATCH_ALL_SESSIONS,
-          false,
+          true,
         );
         const alwaysShowLabels = this.context.globalState.get<boolean>(
           GLOBAL_KEY_ALWAYS_SHOW_LABELS,

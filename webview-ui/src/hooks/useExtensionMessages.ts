@@ -63,6 +63,7 @@ export interface ExtensionMessageState {
   watchAllSessions: boolean;
   setWatchAllSessions: (v: boolean) => void;
   alwaysShowLabels: boolean;
+  lastMessages: Record<number, string>;
   hooksEnabled: boolean;
   setHooksEnabled: (v: boolean) => void;
   hooksInfoShown: boolean;
@@ -86,6 +87,7 @@ export function useExtensionMessages(
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null);
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({});
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({});
+  const [lastMessages, setLastMessages] = useState<Record<number, string>>({});
   const [subagentTools, setSubagentTools] = useState<
     Record<number, Record<string, ToolActivity[]>>
   >({});
@@ -149,6 +151,14 @@ export function useExtensionMessages(
         if (os.characters.size > 0) {
           saveAgentSeats(os);
         }
+      } else if (msg.type === 'agentLastMessage') {
+        const id = msg.id as number;
+        const text = msg.text as string;
+        setLastMessages((prev) => ({ ...prev, [id]: text }));
+      } else if (msg.type === 'agentBranch') {
+        const id = msg.id as number;
+        const branch = msg.branch as string;
+        os.setAgentLabel(id, branch);
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number;
         const folderName = msg.folderName as string | undefined;
@@ -472,6 +482,7 @@ export function useExtensionMessages(
     watchAllSessions,
     setWatchAllSessions,
     alwaysShowLabels,
+    lastMessages,
     hooksEnabled,
     setHooksEnabled,
     hooksInfoShown,

@@ -641,6 +641,11 @@ export class OfficeState {
     this.furniture = layoutToFurnitureInstances(modifiedFurniture);
   }
 
+  setAgentLabel(id: number, label: string): void {
+    const ch = this.characters.get(id);
+    if (ch) ch.folderName = label;
+  }
+
   setAgentTool(id: number, tool: string | null): void {
     const ch = this.characters.get(id);
     if (ch) {

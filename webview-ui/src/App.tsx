@@ -58,6 +58,7 @@ function App() {
     agentStatuses,
     subagentTools,
     subagentCharacters,
+    lastMessages,
     layoutReady,
     layoutWasReset,
     loadedAssets,
@@ -248,6 +249,7 @@ function App() {
             panRef={editor.panRef}
             onCloseAgent={handleCloseAgent}
             alwaysShowOverlay={alwaysShowOverlay}
+            lastMessages={lastMessages}
           />
         </>
       ) : (

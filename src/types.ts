@@ -30,6 +30,12 @@ export interface AgentState {
   seenUnknownRecordTypes: Set<string>;
   /** Whether a hook event has been delivered for this agent (suppresses heuristic timers) */
   hookDelivered: boolean;
+  /** Git branch detected from JSONL records */
+  gitBranch?: string;
+  /** Conversation slug detected from JSONL records */
+  slug?: string;
+  /** Working directory detected from JSONL records */
+  cwd?: string;
 }
 
 export interface PersistedAgent {

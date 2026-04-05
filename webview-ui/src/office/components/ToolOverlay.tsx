@@ -17,29 +17,49 @@ interface ToolOverlayProps {
   panRef: React.RefObject<{ x: number; y: number }>;
   onCloseAgent: (id: number) => void;
   alwaysShowOverlay: boolean;
+  lastMessages?: Record<number, string>;
 }
 
 /** Derive a short human-readable activity string from tools/status */
+const MAX_DISPLAY_WIDTH = 42;
+
+const CJK_RE = /[\u2e80-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef]/;
+function activityFontSize(text: string): string {
+  return CJK_RE.test(text) ? '12px' : '22px';
+}
+
+function truncateByWidth(text: string): string {
+  let width = 0;
+  let i = 0;
+  for (; i < text.length; i++) {
+    const cp = text.codePointAt(i) ?? 0;
+    width += cp > 0x2e7f ? 2 : 1; // CJK and wide chars count as 2
+    if (width > MAX_DISPLAY_WIDTH) return text.slice(0, i) + '…';
+  }
+  return text;
+}
+
 function getActivityText(
   agentId: number,
   agentTools: Record<number, ToolActivity[]>,
   isActive: boolean,
+  lastMessages?: Record<number, string>,
 ): string {
   const tools = agentTools[agentId];
   if (tools && tools.length > 0) {
-    // Find the latest non-done tool
     const activeTool = [...tools].reverse().find((t) => !t.done);
     if (activeTool) {
       if (activeTool.permissionWait) return 'Needs approval';
       return activeTool.status;
     }
-    // All tools done but agent still active (mid-turn) — keep showing last tool status
     if (isActive) {
       const lastTool = tools[tools.length - 1];
       if (lastTool) return lastTool.status;
     }
   }
 
+  const lastMsg = lastMessages?.[agentId];
+  if (lastMsg) return truncateByWidth(lastMsg);
   return 'Idle';
 }
 
@@ -53,6 +73,7 @@ export function ToolOverlay({
   panRef,
   onCloseAgent,
   alwaysShowOverlay,
+  lastMessages,
 }: ToolOverlayProps) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -113,7 +134,7 @@ export function ToolOverlay({
             activityText = sub ? sub.label : 'Subtask';
           }
         } else {
-          activityText = getActivityText(id, agentTools, ch.isActive);
+          activityText = getActivityText(id, agentTools, ch.isActive, lastMessages);
         }
 
         // Determine dot color
@@ -152,7 +173,7 @@ export function ToolOverlay({
                 <span
                   className="overflow-hidden text-ellipsis block leading-none"
                   style={{
-                    fontSize: isSub ? '20px' : '22px',
+                    fontSize: activityFontSize(activityText),
                     fontStyle: isSub ? 'italic' : undefined,
                   }}
                 >
