@@ -36,6 +36,7 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
 
 export function TasksBoard({ tickets, specsDirectories }: TasksBoardProps) {
   const [open, setOpen] = useState(false);
+  const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set());
 
   return (
     <div
@@ -106,97 +107,114 @@ export function TasksBoard({ tickets, specsDirectories }: TasksBoardProps) {
               No tasks found
             </div>
           ) : (
-            tickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                style={{
-                  background: 'var(--color-board-card)',
-                  border: '1px solid var(--color-board-frame)',
-                  boxShadow: '2px 2px 0px var(--color-board-frame)',
-                  padding: '8px 10px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                }}
-              >
+            tickets.map((ticket) => {
+              const expanded = expandedTickets.has(ticket.id);
+              return (
                 <div
+                  key={ticket.id}
                   style={{
-                    fontSize: 16,
-                    fontWeight: 'bold',
-                    color: 'var(--color-board-card-text)',
+                    background: 'var(--color-board-card)',
+                    border: '1px solid var(--color-board-frame)',
+                    boxShadow: '2px 2px 0px var(--color-board-frame)',
+                    padding: '8px 10px',
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'baseline',
+                    flexDirection: 'column',
+                    gap: 4,
                   }}
                 >
-                  <span>{ticket.id}</span>
-                  <span
+                  <div
+                    onClick={() =>
+                      setExpandedTickets((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(ticket.id)) next.delete(ticket.id);
+                        else next.add(ticket.id);
+                        return next;
+                      })
+                    }
                     style={{
-                      fontSize: 13,
-                      color: 'var(--color-board-card-muted)',
-                      fontWeight: 'normal',
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                      color: 'var(--color-board-card-text)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                      cursor: 'pointer',
+                      userSelect: 'none',
                     }}
                   >
-                    {ticket.done}/{ticket.total}
-                  </span>
-                </div>
-                <ProgressBar done={ticket.done} total={ticket.total} />
-                <div className="flex flex-col gap-4" style={{ marginTop: 6 }}>
-                  {ticket.stages.map((stage, i) => {
-                    const stageDone = stage.done === stage.total && stage.total > 0;
-                    return (
-                      <div key={i}>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 'bold',
-                            color: stageDone
-                              ? 'var(--color-status-success)'
-                              : 'var(--color-board-card-text)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginBottom: 2,
-                          }}
-                        >
-                          <span>
-                            {stageDone ? '✓ ' : '■ '}
-                            {stage.name}
-                          </span>
-                          <span
-                            style={{
-                              fontWeight: 'normal',
-                              color: 'var(--color-board-card-muted)',
-                              flexShrink: 0,
-                              marginLeft: 6,
-                            }}
-                          >
-                            {stage.done}/{stage.total}
-                          </span>
-                        </div>
-                        {stage.items.map((item, j) => (
-                          <div
-                            key={j}
-                            style={{
-                              fontSize: 12,
-                              color: item.done
-                                ? 'var(--color-board-card-muted)'
-                                : 'var(--color-board-card-text)',
-                              textDecoration: item.done ? 'line-through' : 'none',
-                              paddingLeft: 12,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {item.done ? '✓' : '·'} {item.text}
+                    <span>
+                      {expanded ? '▾' : '▸'} {ticket.id}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: 'var(--color-board-card-muted)',
+                        fontWeight: 'normal',
+                      }}
+                    >
+                      {ticket.done}/{ticket.total}
+                    </span>
+                  </div>
+                  <ProgressBar done={ticket.done} total={ticket.total} />
+                  {expanded && (
+                    <div className="flex flex-col gap-4" style={{ marginTop: 6 }}>
+                      {ticket.stages.map((stage, i) => {
+                        const stageDone = stage.done === stage.total && stage.total > 0;
+                        return (
+                          <div key={i}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 'bold',
+                                color: stageDone
+                                  ? 'var(--color-status-success)'
+                                  : 'var(--color-board-card-text)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                marginBottom: 2,
+                              }}
+                            >
+                              <span>
+                                {stageDone ? '✓ ' : '■ '}
+                                {stage.name}
+                              </span>
+                              <span
+                                style={{
+                                  fontWeight: 'normal',
+                                  color: 'var(--color-board-card-muted)',
+                                  flexShrink: 0,
+                                  marginLeft: 6,
+                                }}
+                              >
+                                {stage.done}/{stage.total}
+                              </span>
+                            </div>
+                            {stage.items.map((item, j) => (
+                              <div
+                                key={j}
+                                style={{
+                                  fontSize: 12,
+                                  color: item.done
+                                    ? 'var(--color-board-card-muted)'
+                                    : 'var(--color-board-card-text)',
+                                  textDecoration: item.done ? 'line-through' : 'none',
+                                  paddingLeft: 12,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.done ? '✓' : '·'} {item.text}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
