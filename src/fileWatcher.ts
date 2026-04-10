@@ -18,6 +18,7 @@ import {
 } from '../server/src/constants.js';
 import { removeAgent } from './agentManager.js';
 import { TERMINAL_NAME_PREFIX } from './constants.js';
+import { isDismissed } from './dismissPersistence.js';
 import { cancelPermissionTimer, cancelWaitingTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
 import type { AgentState } from './types.js';
@@ -778,10 +779,14 @@ function scanExternalDir(
     if (clearDismissedFiles.has(file)) continue;
 
     // Skip files recently dismissed by the user (closed via X).
-    // Dismissal expires after DISMISSED_COOLDOWN_MS so resumed sessions can be re-adopted.
+    // In-memory cooldown prevents immediate re-adoption after close.
     const dismissedAt = dismissedJsonlFiles.get(file);
     if (dismissedAt && now - dismissedAt < DISMISSED_COOLDOWN_MS) continue;
     if (dismissedAt) dismissedJsonlFiles.delete(file); // Expired, clean up
+
+    // Skip files persistently dismissed (survives restarts).
+    // isDismissed() auto-un-dismisses if JSONL mtime > dismiss time (--resume).
+    if (isDismissed(file)) continue;
 
     // Check if already tracked by an agent (normalize paths for comparison).
     // This prevents the external scanner from adopting /clear files (already
@@ -884,6 +889,7 @@ function scanGlobalProjectDirs(
 
     for (const file of files) {
       if (knownJsonlFiles.has(file)) continue;
+      if (isDismissed(file)) continue;
       let tracked = false;
       for (const agent of agents.values()) {
         if (agent.jsonlFile === file) {

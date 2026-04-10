@@ -42,6 +42,8 @@ export const BASH_COMMAND_DISPLAY_MAX_LENGTH = 30;
 export const TASK_DESCRIPTION_DISPLAY_MAX_LENGTH = 40;
 
 // ── Pixel Agents Server ─────────────────────────────────────
+export const DISMISSED_FILE_NAME = 'dismissed.json';
+
 export const SERVER_JSON_DIR = '.pixel-agents';
 export const SERVER_JSON_NAME = 'server.json';
 export const HOOK_SCRIPTS_DIR = '.pixel-agents/hooks';

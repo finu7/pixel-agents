@@ -47,6 +47,7 @@ import {
   LAYOUT_REVISION_KEY,
   WORKSPACE_KEY_AGENT_SEATS,
 } from './constants.js';
+import { dismissFile } from './dismissPersistence.js';
 import {
   dismissedJsonlFiles,
   ensureProjectScan,
@@ -209,6 +210,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
             // External agent — remove from tracking and dismiss the file
             // so the external scanner doesn't re-adopt it
             dismissedJsonlFiles.set(agent.jsonlFile, Date.now());
+            dismissFile(agent.jsonlFile);
             removeAgent(
               message.id,
               this.agents,
@@ -228,6 +230,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
             agent.terminalRef.dispose();
           } else {
             dismissedJsonlFiles.set(agent.jsonlFile, Date.now());
+            dismissFile(agent.jsonlFile);
             removeAgent(
               id,
               this.agents,
@@ -294,6 +297,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
             const agent = this.agents.get(id);
             if (agent) {
               dismissedJsonlFiles.set(agent.jsonlFile, Date.now());
+              dismissFile(agent.jsonlFile);
               this.globalDismissedFiles.add(agent.jsonlFile);
               this.knownJsonlFiles.delete(agent.jsonlFile);
             }
@@ -682,6 +686,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           }
           // Dismiss JSONL so external scanner doesn't re-adopt it
           dismissedJsonlFiles.set(agent.jsonlFile, Date.now());
+          dismissFile(agent.jsonlFile);
           this.unregisterAgentHook(agent);
           removeAgent(
             id,
